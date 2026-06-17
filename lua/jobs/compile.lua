@@ -295,8 +295,8 @@ local function compile(cmd, extractors)
 
     local function conf(bufnr)
         vim.bo[bufnr].filetype = "compilation"
-        vim.keymap.set("n", "<leader>k", prev)
-        vim.keymap.set("n", "<leader>j", next)
+        vim.keymap.set("n", "<C-k>", prev, { buf = bufnr })
+        vim.keymap.set("n", "<C-j>", next, { buf = bufnr })
         for _, entry in ipairs(entries) do
             hlentry(bufnr, entry)
         end
