@@ -209,7 +209,8 @@ local function start(id, cmd, opts)
     end
 
     -- TODO: make this not use `setpgid`
-    local obj = vim.system({ "setpgid", "--", unpack(cmd) }, {
+    local obj = vim.system(cmd, {
+        detach = true,
         text = true,
         stdout = chunker(writer, { job = job, cb = cb.out or {} }),
         stderr = chunker(writer, { job = job, cb = cb.err or {} })
