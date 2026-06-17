@@ -4,8 +4,8 @@ local fn = vim.fn
 
 local loglvl = vim.log.levels
 
-local jobc = require("jobctrl")
-local bufu = require("bufutil")
+local jobc = require("jobs/control")
+local bufu = require("jobs/bufutil")
 
 local o = vim.o
 

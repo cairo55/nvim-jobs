@@ -1,5 +1,5 @@
 -- PRELUDE --
-local bufu = require("bufutil")
+local bufu = require("jobs/bufutil")
 
 local loglvl = vim.log.levels
 
