@@ -265,6 +265,16 @@ function Job:buf()
     local new = bufu.new(name)
     buf.nr = new
 
+    api.nvim_create_autocmd("BufDelete", {
+        buffer = new,
+        callback = function()
+            if self.exit then return end
+            vim.notify(string.format("%s will continue to run", self.id))
+
+        end,
+        group = api.nvim_create_augroup("Compilation", { clear = true })
+    })
+
     if bufopts.headercb then
         buf.header = bufopts.headercb()
         bufu.append(buf.nr, buf.header)
