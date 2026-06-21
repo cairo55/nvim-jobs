@@ -65,11 +65,11 @@ end
 local function setup(assocs)
   vim.validate('assocs', assocs, 'table', true)
   if assocs then
-    for i = 1, #assoc do
-      assoc[i] = nil
+    for k in pairs(assoc) do
+      assoc[k] = nil
     end
-    for i = 1, #assocs do
-      assoc[i] = assocs[i]
+    for k in pairs(assocs) do
+      assoc[k] = assocs[k]
     end
   end
 
