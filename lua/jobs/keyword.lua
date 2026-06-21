@@ -9,6 +9,7 @@ local bufu = require('jobs/bufutil')
 --- @class Keyword.Association
 --- @field name string   Short and helpful identifier for the command
 --- @field cmd  string[] The command
+--- @field ft   string   Filetype to use for the opened buffer
 
 --- @type table<string, Keyword.Association>
 local assoc = {}
@@ -26,7 +27,14 @@ local function keyword(kw)
 
   local id = string.format('keyword %s %s', name, kw)
   local job = jobc.start(id, { unpack(cmd), kw }, {
-    buf = { name = string.format('[%s %s]', name, kw) },
+    buf = {
+      name = string.format('[%s %s]', name, kw),
+      confcb = function(bufnr)
+        if assoc[ft].ft then
+          vim.bo[bufnr].filetype = assoc[ft].ft
+        end
+      end
+    },
   })
   if not job then
     return
