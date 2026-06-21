@@ -1,14 +1,9 @@
 -- PRELUDE --
-local fn = vim.fn
 local api = vim.api
-
-local o = vim.o
-local bo = vim.bo
+local loglvl = vim.log.levels
 
 local bufu = require('jobs/bufutil')
 local jobc = require('jobs/control')
-
-local loglvl = vim.log.levels
 
 -- COMMANDS --
 local function JobStop_complete()

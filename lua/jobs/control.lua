@@ -211,7 +211,6 @@ local function start(id, cmd, opts)
     end
   end
 
-  -- TODO: make this not use `setpgid`
   local obj = vim.system(cmd, {
     detach = true,
     text = true,

@@ -2,8 +2,6 @@
 local fn = vim.fn
 local api = vim.api
 
-local loglvl = vim.log.levels
-
 local jobc = require('jobs/control')
 local bufu = require('jobs/bufutil')
 
