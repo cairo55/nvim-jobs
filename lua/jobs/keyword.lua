@@ -8,12 +8,14 @@ local jobc = require("jobs/control")
 local bufu = require("jobs/bufutil")
 
 -- STATE --
+--- @class Keyword.Association
+--- @field name string   Short and helpful identifier for the command
+--- @field cmd  string[] The command
 
---- @type table<string, { name: string, cmd: string[] }>
+--- @type table<string, Keyword.Association>
 local assoc = {}
 
 -- IMPLEMENTATION --
-
 local function keyword(kw)
     local ft = vim.bo.filetype
     if not assoc[ft] then
@@ -35,7 +37,6 @@ local function keyword(kw)
 end
 
 -- COMMANDS --
-
 local function Keyword(opts)
     local mode = fn.mode()
 
@@ -58,10 +59,17 @@ local function Keyword(opts)
 end
 
 -- SETUP --
-
-local function setup(associations)
-    vim.validate("associations", associations, "table", true)
-    assoc = associations
+--- @param assocs? table<string, Keyword.Association>
+local function setup(assocs)
+    vim.validate("assocs", assocs, "table", true)
+    if assocs then
+        for i = 1, #assoc do
+            assoc[i] = nil
+        end
+        for i = 1, #assocs do
+            assoc[i] = assocs[i]
+        end
+    end
 
     api.nvim_create_user_command("Keyword", Keyword, {
         nargs = "*",
@@ -71,6 +79,7 @@ end
 
 -- INTERFACE --
 return {
-    setup = setup,
-    keyword = keyword
+    setup   = setup,
+    keyword = keyword,
+    assoc   = assoc
 }
