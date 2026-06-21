@@ -10,48 +10,49 @@ local bufu = require("jobs/bufutil")
 local o = vim.o
 
 -- TYPES --
-
---- @class CompilationEntryFile
+--- @class Compilation.Entry.File
 --- @field value    string
 --- @field startpos integer
 --- @field endpos   integer
 
---- @class CompilationEntryLine
+--- @class Compilation.Entry.Line
 --- @field value    integer
 --- @field startpos integer
 --- @field endpos   integer
 
---- @class CompilationEntryColumn
+--- @class Compilation.Entry.Column
 --- @field value    integer
 --- @field startpos integer
 --- @field endpos   integer
 
---- @class CompilationEntrySeverity
+--- @class Compilation.Entry.Severity
 --- @field value    vim.diagnostic.Severity
 --- @field startpos integer
 --- @field endpos   integer
 
---- @class CompilationEntry
+--- @class Compilation.Entry
 --- @field lnum?     integer
---- @field file      CompilationEntryFile
---- @field line      CompilationEntryLine
---- @field column?   CompilationEntryColumn
---- @field severity? CompilationEntrySeverity
+--- @field file      Compilation.Entry.File
+--- @field line      Compilation.Entry.Line
+--- @field column?   Compilation.Entry.Column
+--- @field severity? Compilation.Entry.Severity
+
+--- @alias CompilationParser fun(line: string): Compilation.Entry
 
 -- STATE --
+local S = {}
 
 --- @type integer?
-local current = nil
+S.current = nil
 
---- @type CompilationEntry[]
-local entries = {}
+--- @type Compilation.Entry[]
+S.entries = {}
 
---- @type (fun(line: string): CompilationEntry)[]
-local extract = {}
+--- @type CompilationParser[]
+S.parsers = {}
 
 -- ENTRIES --
-
---- @param entry CompilationEntry
+--- @param entry Compilation.Entry
 --- @return boolean
 local function setentry(entry)
     local file   = entry.file.value
@@ -103,7 +104,6 @@ local function setentry(entry)
     return true
 end
 
---- @param entry CompilationEntry
 local function shouldjump(entry)
     local fname = fn.expand("%:t")
     local row, col = unpack(vim.api.nvim_win_get_cursor(0))
@@ -124,21 +124,21 @@ local function shouldjump(entry)
 end
 
 local function next()
-    if #entries == 0 then
+    if #S.entries == 0 then
         vim.notify("No entries", loglvl.WARN)
         return
     end
 
-    local new = (current or 0) + 1
+    local new = (S.current or 0) + 1
     local start = new
-    while new <= #entries do
-        local entry = entries[new]
+    while new <= #S.entries do
+        local entry = S.entries[new]
         if shouldjump(entry) and setentry(entry) then
             local diff = new - start
             if diff > 0 then
                 vim.notify(string.format("Skipped %i entries", diff), loglvl.WARN)
             end
-            current = new
+            S.current = new
             return
         end
         new = new + 1
@@ -148,20 +148,20 @@ local function next()
 end
 
 local function prev()
-    if #entries == 0 then
+    if #S.entries == 0 then
         vim.notify("No entries", loglvl.WARN)
         return
     end
 
-    local new = (current or #entries + 1) - 1
+    local new = (S.current or #S.entries + 1) - 1
     local start = new
     while new > 0 do
-        if setentry(entries[new]) then
+        if setentry(S.entries[new]) then
             local diff = start - new
             if diff > 0 then
                 vim.notify(string.format("Skipped %i entries", diff), loglvl.WARN)
             end
-            current = new
+            S.current = new
             return
         end
         new = new - 1
@@ -171,7 +171,6 @@ local function prev()
 end
 
 -- HIGHLIGHTING --
-
 local function hl(bufnr, hl_group, row, startcol, endcol)
     local ns = api.nvim_create_namespace("Compilation")
     api.nvim_buf_set_extmark(bufnr, ns, row-1, startcol-1, {
@@ -181,7 +180,7 @@ local function hl(bufnr, hl_group, row, startcol, endcol)
     })
 end
 
---- @param entry CompilationEntry
+--- @param entry Compilation.Entry
 local function hlentry(bufnr, entry)
     local lnum     = entry.lnum
     local file     = entry.file
@@ -212,22 +211,26 @@ local function hlentry(bufnr, entry)
 end
 
 -- JOB --
+--- @param cmd      string|table
+--- @param parsers? CompilationParser[]
+local function compile(cmd, parsers)
+    vim.validate({
+        cmd     = { cmd,     { "string", "table" }       },
+        parsers = { parsers, { "table"           }, true }
+    })
 
---- @param cmd string|table
---- @param extractors? CompilationEntry
-local function compile(cmd, extractors)
-    extractors = extractors or extract
+    S.current = nil
+    S.entries = {}
 
-    current = nil
-    entries = {}
+    parsers = parsers or S.parsers
 
     local function post(job, lineinfo)
         for _, li in ipairs(lineinfo) do
-            for _, extractor in ipairs(extractors) do
-                local entry = extractor(li.line)
+            for _, parser in ipairs(parsers) do
+                local entry = parser(li.line)
                 if entry then
                     entry.lnum = li.lnum
-                    table.insert(entries, entry)
+                    table.insert(S.entries, entry)
                     local buf = job.buffer
                     if bufu.loaded_p(buf.nr) then
                         hlentry(buf.nr, entry)
@@ -239,17 +242,17 @@ local function compile(cmd, extractors)
         local bufnr = job.buffer.nr
         local wins = fn.win_findbuf(bufnr)
         for _, win in ipairs(wins) do
+            local lc  = api.nvim_buf_line_count(job.buffer.nr)
             local row = api.nvim_win_get_cursor(win)[1]
-            local lc = api.nvim_buf_line_count(job.buffer.nr)
             if row == lc - #lineinfo and row > #job.buffer.header then
                 api.nvim_win_set_cursor(win, {lc, 0})
+                api.nvim_win_call(win, function()
+                    local wh = api.nvim_win_get_height(0)
+                    fn.winrestview({
+                        topline = math.ceil(math.max(1, row - wh/2))
+                    })
+                end)
             end
-            vim.api.nvim_win_call(win, function()
-                local wh = api.nvim_win_get_height(0)
-                fn.winrestview({
-                    topline = math.ceil(math.max(1, row - wh/2))
-                })
-            end)
         end
     end
 
@@ -260,7 +263,7 @@ local function compile(cmd, extractors)
         else
             local args = {}
             for _, s in ipairs(cmd) do
-                table.insert(args, string.format('"%s"', s))
+                table.insert(args, string.format('`%s\'', s))
             end
             cmds = string.format("cmd: [ %s ]", table.concat(args, ", "))
         end
@@ -295,9 +298,21 @@ local function compile(cmd, extractors)
 
     local function conf(bufnr)
         vim.bo[bufnr].filetype = "compilation"
+
         vim.keymap.set("n", "<C-k>", prev, { buf = bufnr })
         vim.keymap.set("n", "<C-j>", next, { buf = bufnr })
-        for _, entry in ipairs(entries) do
+        vim.keymap.set("n", "<Enter>", function()
+            local row = api.nvim_win_get_cursor(0)[1]
+            for _, entry in ipairs(S.entries) do
+                if entry.lnum == row then
+                    if not shouldjump(entry) or not setentry(entry) then
+                        vim.notify("failed to set entry", loglvl.WARN)
+                    end
+                end
+            end
+        end, { buf = bufnr })
+
+        for _, entry in ipairs(S.entries) do
             hlentry(bufnr, entry)
         end
     end
@@ -327,12 +342,39 @@ local function compile(cmd, extractors)
 
     local buf = job:buf()
     bufu.current(buf)
-    api.nvim_win_set_cursor(0, {#job.buffer.header, 0})
+    -- api.nvim_win_set_cursor(0, {#job.buffer.header, 0})
+end
+
+-- COMMANDS --
+local function Compile(opts)
+    local args = opts.args
+    if args ~= "" then
+        compile(opts.args)
+        return
+    end
+
+    local job = jobc.last("Compilation")
+    if not job then
+        vim.notify("No compilation buffer", loglvl.WARN)
+        return
+    end
+
+    bufu.current(job:buf())
 end
 
 -- SETUP --
+--- @param parsers? CompilationParser[]
+local function setup(parsers)
+    vim.validate("parsers", parsers, "table", true)
+    if parsers then
+        for i = 1, #S.parsers do
+            S.parsers[i] = nil
+        end
+        for i = 1, #parsers do
+            S.parsers[i] = parsers[i]
+        end
+    end
 
-local function setup()
     for _, hl in ipairs({
         {
             name = "compilationEntryFile",
@@ -362,33 +404,26 @@ local function setup()
         api.nvim_set_hl(0, hl.name, { default = true, link = hl.link })
     end
 
-    local function compile_cmd(opts)
-        local args = opts.args
-        if args ~= "" then
-            compile(opts.args)
-            return
-        end
-
-        local job = jobc.last("Compilation")
-        if not job then
-            vim.notify("No compilation buffer", loglvl.WARN)
-            return
-        end
-
-        bufu.current(job:buf())
-    end
-
-    api.nvim_create_user_command("Compile", compile_cmd, {
+    api.nvim_create_user_command("Compile", Compile, {
         bang = true,
         nargs = "*",
         complete = "shellcmdline",
     })
+    api.nvim_create_user_command("CompilationNext", next, {
+        nargs = 0,
+        bar = true,
+    })
+    api.nvim_create_user_command("CompilationPrev", prev, {
+        nargs = 0,
+        bar = true,
+    })
 end
 
 -- INTERFACE --
-
 return {
     setup   = setup,
     compile = compile,
-    extract = extract,
+    next    = next,
+    prev    = prev,
+    parsers = S.parsers,
 }
