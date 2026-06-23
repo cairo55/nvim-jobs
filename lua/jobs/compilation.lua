@@ -206,6 +206,7 @@ local function hlentry(bufnr, entry)
     [vim.diagnostic.severity.ERROR] = 'compilationEntrySeverityError',
     [vim.diagnostic.severity.WARN] = 'compilationEntrySeverityWarn',
     [vim.diagnostic.severity.INFO] = 'compilationEntrySeverityInfo',
+    [vim.diagnostic.severity.HINT] = 'compilationEntrySeverityHint',
   }
   if severity then
     hl(bufnr, sevhl[entry.severity.value], lnum, severity.startpos, severity.endpos)
@@ -237,6 +238,7 @@ local function compile(cmd, parsers)
           if bufu.loaded_p(buf.nr) then
             hlentry(buf.nr, entry)
           end
+          break
         end
       end
     end
