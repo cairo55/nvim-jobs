@@ -33,7 +33,7 @@ local function keyword(kw)
         if assoc[ft].ft then
           vim.bo[bufnr].filetype = assoc[ft].ft
         end
-      end
+      end,
     },
   })
   if not job then
@@ -48,12 +48,13 @@ end
 local function Keyword(opts)
   local mode = fn.mode()
 
-  -- TODO: implement visual mode
   local selection
   if opts.args ~= '' then
     selection = opts.args
   elseif mode == 'n' or mode:sub(1, 2) == 'ni' then
     selection = fn.expand('<cword>')
+  elseif mode == 'v' or mode == 'vs' then
+    selection = fn.getregion(fn.getpos('.'), fn.getpos('v'))[1]
   else
     return
   end
