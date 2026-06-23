@@ -25,7 +25,7 @@ local function keyword(kw)
   local cmd = assoc[ft].cmd
   local name = assoc[ft].name
 
-  local id = string.format('keyword %s %s', name, kw)
+  local id = string.format('%s %s', name, kw)
   local job = jobc.start(id, { unpack(cmd), kw }, {
     buf = {
       name = string.format('[%s %s]', name, kw),
