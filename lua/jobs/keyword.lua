@@ -22,11 +22,12 @@ local function keyword(kw)
     return
   end
 
-  local cmd = assoc[ft].cmd
   local name = assoc[ft].name
+  local cmd = { unpack(assoc[ft].cmd) }
+  table.insert(cmd, kw)
 
   local id = string.format('%s %s', name, kw)
-  local job = jobc.start(id, { unpack(cmd), kw }, {
+  local job = jobc.start(id, cmd, {
     buf = {
       name = string.format('[%s %s]', name, kw),
       confcb = function(bufnr)
