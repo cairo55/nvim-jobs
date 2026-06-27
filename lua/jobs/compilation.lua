@@ -1,13 +1,11 @@
 -- PRELUDE --
 local api = vim.api
 local fn = vim.fn
-
+local o = vim.o
 local loglvl = vim.log.levels
 
 local jobc = require('jobs/control')
 local bufu = require('jobs/bufutil')
-
-local o = vim.o
 
 -- TYPES --
 --- @class Compilation.Entry.File
@@ -353,6 +351,7 @@ local function Compile(opts)
   local args = opts.args
   if args ~= '' then
     compile(opts.args)
+    vim.g.recompile = opts.args
     return
   end
 
@@ -363,6 +362,14 @@ local function Compile(opts)
   end
 
   bufu.current(job:buf())
+end
+
+local function Recompile()
+  if vim.g.recompile == '' then
+    vim.notify('No previous compilation command', loglvl.ERROR)
+    return
+  end
+  compile(vim.g.recompile)
 end
 
 -- SETUP --
@@ -407,8 +414,13 @@ local function setup(parsers)
     api.nvim_set_hl(0, hl.name, { default = true, link = hl.link })
   end
 
+  vim.g.recompile = ''
+
+  api.nvim_create_user_command('Recompile', Recompile, {
+    nargs = 0,
+    bar = true,
+  })
   api.nvim_create_user_command('Compile', Compile, {
-    bang = true,
     nargs = '*',
     complete = 'shellcmdline',
   })
