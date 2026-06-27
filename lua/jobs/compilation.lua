@@ -341,9 +341,23 @@ local function compile(cmd, parsers)
     return
   end
 
-  local buf = job:buf()
-  bufu.current(buf)
-  api.nvim_win_set_cursor(0, {#job.buffer.header, 0})
+  local bufnr = job:buf()
+
+  local found = false
+  local wins = api.nvim_tabpage_list_wins(0)
+  for _, win in ipairs(wins) do
+    if api.nvim_win_get_buf(win) == bufnr then
+      found = true
+    end
+  end
+  if not found then
+    bufu.current(bufnr)
+  end
+
+  wins = fn.win_findbuf(bufnr)
+  for _, win in ipairs(wins) do
+    api.nvim_win_set_cursor(win, {#job.buffer.header, 0})
+  end
 end
 
 -- COMMANDS --
