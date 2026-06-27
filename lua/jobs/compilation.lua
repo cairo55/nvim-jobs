@@ -343,7 +343,7 @@ local function compile(cmd, parsers)
 
   local buf = job:buf()
   bufu.current(buf)
-  -- api.nvim_win_set_cursor(0, {#job.buffer.header, 0})
+  api.nvim_win_set_cursor(0, {#job.buffer.header, 0})
 end
 
 -- COMMANDS --
