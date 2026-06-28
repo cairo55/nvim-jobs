@@ -28,12 +28,18 @@ local bufu = require('jobs/bufutil')
 --- @field startpos integer
 --- @field endpos   integer
 
+--- @class Compilation.Entry.Text
+--- @field value    string
+--- @field startpos integer
+--- @field endpos   integer
+
 --- @class Compilation.Entry
 --- @field lnum?     integer
 --- @field file      Compilation.Entry.File
 --- @field line      Compilation.Entry.Line
 --- @field column?   Compilation.Entry.Column
 --- @field severity? Compilation.Entry.Severity
+--- @field text?     Compilation.Entry.Text
 
 --- @alias CompilationParser fun(line: string): Compilation.Entry
 
@@ -170,6 +176,45 @@ local function prev()
   end
 
   vim.notify('No previous entries', loglvl.WARN)
+end
+
+local function toqf()
+  if #S.entries == 0 then
+    vim.notify('No entries', loglvl.ERROR)
+    return
+  end
+
+  local title = vim.g.recompile
+  if title == '' then
+    title = 'Compilation'
+  end
+
+  local type = {
+    [vim.diagnostic.severity.ERROR] = 'E',
+    [vim.diagnostic.severity.WARN] = 'W',
+    [vim.diagnostic.severity.INFO] = 'I',
+    [vim.diagnostic.severity.HINT] = 'H',
+  }
+
+  local qf = {}
+  for _, entry in ipairs(S.entries) do
+    local qfe = {
+      filename = entry.file.value,
+      lnum = entry.line.value,
+    }
+    if entry.col then
+      qfe.col = entry.col.value
+    end
+    if entry.severity then
+      qfe.type = type[entry.severity.value]
+    end
+    if entry.text then
+      qfe.text = entry.text.value
+    end
+    table.insert(qf, qfe)
+  end
+  fn.setqflist(qf, 'r')
+  fn.setqflist({}, 'a', { title = title })
 end
 
 -- HIGHLIGHTING --
@@ -345,7 +390,7 @@ local function compile(cmd, parsers)
   if not bufu.visible_p(buf) then
     bufu.current(buf)
   end
-  bufu.set_cursor(buf, {#job.buffer.header, 0})
+  bufu.set_cursor(buf, { #job.buffer.header, 0 })
 end
 
 -- COMMANDS --
@@ -426,11 +471,15 @@ local function setup(parsers)
     nargs = '*',
     complete = 'shellcmdline',
   })
-  api.nvim_create_user_command('CompilationNext', next, {
+  api.nvim_create_user_command('EntryNext', next, {
     nargs = 0,
     bar = true,
   })
-  api.nvim_create_user_command('CompilationPrev', prev, {
+  api.nvim_create_user_command('EntryPrev', prev, {
+    nargs = 0,
+    bar = true,
+  })
+  api.nvim_create_user_command('EntriesToQf', toqf, {
     nargs = 0,
     bar = true,
   })
@@ -442,5 +491,6 @@ return {
   compile = compile,
   next = next,
   prev = prev,
+  toqf = toqf,
   parsers = S.parsers,
 }
