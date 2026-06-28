@@ -42,7 +42,9 @@ local function keyword(kw)
   end
 
   local buf = job:buf()
-  bufu.current(buf)
+  if not bufu.visible_p(buf) then
+    bufu.current(buf)
+  end
 end
 
 -- COMMANDS --
