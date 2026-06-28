@@ -176,6 +176,26 @@ local function posvalid_p(bufnr, row, column)
   return column >= 0 and column <= #line
 end
 
+--- @param bufnr integer
+local function visible_p(bufnr)
+  local wins = api.nvim_tabpage_list_wins(0)
+  for _, win in ipairs(wins) do
+    if api.nvim_win_get_buf(win) == bufnr then
+      return true
+    end
+  end
+  return false
+end
+
+--- @param bufnr integer
+--- @param pos   [integer, integer]
+local function set_cursor(bufnr, pos)
+  local wins = fn.win_findbuf(bufnr)
+  for _, win in ipairs(wins) do
+    api.nvim_win_set_cursor(win, pos)
+  end
+end
+
 return {
   new = new,
   modify = modify,
@@ -188,4 +208,6 @@ return {
   loaded_p = loaded_p,
   valid_p = valid_p,
   posvalid_p = posvalid_p,
+  visible_p = visible_p,
+  set_cursor = set_cursor,
 }
