@@ -150,7 +150,10 @@ local function set(nr)
   if shouldjump(entry) then
     if not setentry(entry) then
       vim.notify('Failed to set entry', loglvl.ERROR)
+      return
     end
+    S.current = nr
+    vim.notify(string.format('%i out of %i', nr, #S.entries))
   end
 end
 
@@ -161,14 +164,10 @@ local function next()
   end
 
   local new = (S.current or 0) + 1
-  local start = new
   while new <= #S.entries do
     local entry = S.entries[new]
     if shouldjump(entry) and setentry(entry) then
-      local diff = new - start
-      if diff > 0 then
-        vim.notify(string.format('Skipped %i entries', diff), loglvl.WARN)
-      end
+      vim.notify(string.format('%i out of %i', new, #S.entries))
       S.current = new
       return
     end
@@ -185,14 +184,10 @@ local function prev()
   end
 
   local new = (S.current or #S.entries + 1) - 1
-  local start = new
   while new > 0 do
     if setentry(S.entries[new]) then
-      local diff = start - new
-      if diff > 0 then
-        vim.notify(string.format('Skipped %i entries', diff), loglvl.WARN)
-      end
       S.current = new
+      vim.notify(string.format('%i out of %i', new, #S.entries))
       return
     end
     new = new - 1
@@ -507,7 +502,7 @@ local function setup(parsers)
     bar = true,
   })
   api.nvim_create_user_command('EntrySet', function(opts)
-    if opts.args == "" then
+    if opts.args == '' then
       set(0)
       return
     end
