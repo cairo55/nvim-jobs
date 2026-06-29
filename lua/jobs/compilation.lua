@@ -131,6 +131,29 @@ local function shouldjump(entry)
   return false
 end
 
+--- @param nr integer
+local function set(nr)
+  if #S.entries == 0 then
+    vim.notify('No entries', loglvl.WARN)
+    return
+  end
+
+  if nr == 0 then
+    nr = S.current or 1
+  elseif nr > #S.entries then
+    nr = #S.entries
+  elseif nr < 1 then
+    nr = 1
+  end
+
+  local entry = S.entries[nr]
+  if shouldjump(entry) then
+    if not setentry(entry) then
+      vim.notify('Failed to set entry', loglvl.ERROR)
+    end
+  end
+end
+
 local function next()
   if #S.entries == 0 then
     vim.notify('No entries', loglvl.WARN)
@@ -479,6 +502,21 @@ local function setup(parsers)
     nargs = 0,
     bar = true,
   })
+  api.nvim_create_user_command('EntrySet', function(opts)
+    if opts.args == "" then
+      set(0)
+      return
+    end
+    local nr = tonumber(opts.args)
+    if not nr then
+      vim.notify('Not a number', loglvl.ERROR)
+      return
+    end
+    set(nr)
+  end, {
+    nargs = '?',
+    bar = true,
+  })
   api.nvim_create_user_command('EntriesToQf', toqf, {
     nargs = 0,
     bar = true,
@@ -489,8 +527,10 @@ end
 return {
   setup = setup,
   compile = compile,
+  set = set,
   next = next,
   prev = prev,
   toqf = toqf,
+  entries = entries,
   parsers = S.parsers,
 }
