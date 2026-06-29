@@ -202,8 +202,8 @@ local function toqf()
       filename = entry.file.value,
       lnum = entry.line.value,
     }
-    if entry.col then
-      qfe.col = entry.col.value
+    if entry.column then
+      qfe.col = entry.column.value
     end
     if entry.severity then
       qfe.type = type[entry.severity.value]
