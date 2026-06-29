@@ -61,7 +61,7 @@ S.parsers = {}
 local function setentry(entry)
   local file = entry.file.value
   local row = entry.line.value
-  local column = entry.column and entry.column.value - 1 or nil
+  local column = entry.column and entry.column.value - 1 or 0
 
   local bufnr = bufu.nr(file)
   if bufnr > 0 then
