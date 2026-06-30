@@ -367,11 +367,14 @@ local function compile(cmd, parsers)
     vim.keymap.set('n', '<C-j>', next, { buf = bufnr })
     vim.keymap.set('n', '<Enter>', function()
       local row = api.nvim_win_get_cursor(0)[1]
-      for _, entry in ipairs(S.entries) do
+      for i = 1, #S.entries do
+        local entry = S.entries[i]
         if entry.lnum == row then
           if not shouldjump(entry) or not setentry(entry) then
             vim.notify('failed to set entry', loglvl.WARN)
+            return
           end
+          vim.notify(string.format('%i out of %i', i, #S.entries))
         end
       end
     end, { buf = bufnr })
