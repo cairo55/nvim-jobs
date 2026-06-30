@@ -235,10 +235,6 @@ local function toqf()
   fn.setqflist({}, 'a', { title = title })
 end
 
-local function entries()
-  return vim.deepcopy(S.entries)
-end
-
 -- HIGHLIGHTING --
 local function hl(bufnr, hl_group, row, startcol, endcol)
   local ns = api.nvim_create_namespace('Compilation')
@@ -530,6 +526,5 @@ return {
   next = next,
   prev = prev,
   toqf = toqf,
-  entries = entries,
   parsers = S.parsers,
 }
