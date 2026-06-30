@@ -46,6 +46,11 @@ local bufu = require('jobs/bufutil')
 -- STATE --
 local S = {}
 
+--- @type integer
+S.entrymark = nil
+--- @type integer
+S.entrymarkbuf = 0
+
 --- @type integer?
 S.current = nil
 
@@ -54,6 +59,13 @@ S.entries = {}
 
 --- @type CompilationParser[]
 S.parsers = {}
+
+-- CURRENT ENTRY EXTMARK --
+local markopts = {
+  sign_text = '>',
+  sign_hl_group = 'FoldColumn',
+  line_hl_group = 'CompilationCurrentEntry',
+}
 
 -- ENTRIES --
 --- @param entry Compilation.Entry
@@ -109,6 +121,17 @@ local function setentry(entry)
 
   bufu.current(bufnr)
   api.nvim_win_set_cursor(0, { row, column })
+
+  local compbuf = S.job.buffer.nr
+  local ns = api.nvim_create_namespace('Compilation')
+  if S.entrymark and bufu.loaded_p(S.entrymarkbuf) then
+    api.nvim_buf_del_extmark(S.entrymarkbuf, ns, S.entrymark)
+  end
+  if bufu.loaded_p(compbuf) then
+    S.entrymarkbuf = compbuf
+    S.entrymark = api.nvim_buf_set_extmark(compbuf, ns, entry.lnum - 1, 0, markopts)
+  end
+
   return true
 end
 
@@ -231,8 +254,8 @@ local function toqf()
     end
     table.insert(qf, qfe)
   end
-  fn.setqflist(qf, 'r')
-  fn.setqflist({}, 'a', { title = title })
+  fn.setqflist({}, 'r', { title = title })
+  fn.setqflist(qf, 'a')
 end
 
 -- HIGHLIGHTING --
@@ -382,6 +405,15 @@ local function compile(cmd, parsers)
     for _, entry in ipairs(S.entries) do
       hlentry(bufnr, entry)
     end
+
+    local current = S.entries[S.current]
+    if not current then
+      return
+    end
+
+    local ns = api.nvim_create_namespace('Compilation')
+    S.entrymarkbuf = bufnr
+    S.entrymark = api.nvim_buf_set_extmark(bufnr, ns, current.lnum - 1, 0, markopts)
   end
 
   local jcmd = cmd
@@ -406,6 +438,8 @@ local function compile(cmd, parsers)
     vim.notify('A compilation process is already running', loglvl.WARN)
     return
   end
+
+  S.job = job
 
   local buf = job:buf()
   if not bufu.visible_p(buf) then
@@ -454,6 +488,10 @@ local function setup(parsers)
   end
 
   for _, hl in ipairs({
+    {
+      name = 'CompilationCurrentEntry',
+      link = 'QuickFixLine',
+    },
     {
       name = 'compilationEntryFile',
       link = 'Directory',
