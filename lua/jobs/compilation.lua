@@ -89,6 +89,7 @@ local function setentry(entry)
       return false
     end
     bufnr = fn.bufadd(file)
+    vim.bo[bufnr].buflisted = true
     added = true
   end
 
@@ -206,7 +207,7 @@ local function prev()
     return
   end
 
-  local new = (S.current or #S.entries + 1) - 1
+  local new = (S.current or 0) + 1
   while new > 0 do
     if setentry(S.entries[new]) then
       S.current = new
