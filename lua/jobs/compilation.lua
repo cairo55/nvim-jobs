@@ -207,7 +207,7 @@ local function prev()
     return
   end
 
-  local new = (S.current or 0) + 1
+  local new = (S.current or 2) - 1
   while new > 0 do
     if setentry(S.entries[new]) then
       S.current = new
