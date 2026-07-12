@@ -441,12 +441,6 @@ local function compile(cmd, parsers)
   end
 
   S.job = job
-
-  local buf = job:buf()
-  if not bufu.visible_p(buf) then
-    bufu.current(buf)
-  end
-  bufu.set_cursor(buf, { #job.buffer.header, 0 })
 end
 
 -- COMMANDS --
@@ -455,7 +449,6 @@ local function Compile(opts)
   if args ~= '' then
     compile(opts.args)
     vim.g.recompile = opts.args
-    return
   end
 
   local job = jobc.last('Compilation')
@@ -464,7 +457,11 @@ local function Compile(opts)
     return
   end
 
-  bufu.current(job:buf())
+  local buf = job:buf()
+  if not bufu.visible_p(buf) then
+    bufu.current(buf)
+  end
+  bufu.set_cursor(buf, { #job.buffer.header, 0 })
 end
 
 local function Recompile()

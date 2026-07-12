@@ -105,7 +105,7 @@ local function current(new)
   })
 
   local old = api.nvim_get_current_buf()
-  if new then
+  if new and new ~= old then
     api.nvim_set_current_buf(new)
   end
   return old
@@ -120,7 +120,9 @@ local function name(bufnr, new)
   })
 
   local old = fn.bufname()
-  if new then
+  -- With `nomodifiable`, setting the buffer name to the same as it currently
+  -- is seems to unset the alternate buffer for some reason. So don't do that.
+  if new and new ~= old then
     api.nvim_buf_set_name(bufnr, new)
   end
   return old

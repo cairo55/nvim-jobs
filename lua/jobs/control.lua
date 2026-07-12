@@ -57,6 +57,9 @@ local bufu = require('jobs/bufutil')
 --- @type Job.Table
 local jobs = {}
 
+-- AUGROUP --
+local augroup = api.nvim_create_augroup('JobCtrl', { clear = true })
+
 -- INPUT PROCESSING --
 local function chunker(cb, ctx)
   local accum = ''
@@ -277,7 +280,7 @@ function Job:buf()
       end
       vim.notify(string.format('%s will continue to run', self.id))
     end,
-    group = api.nvim_create_augroup('Compilation', { clear = true }),
+    group = augroup,
   })
 
   if bufopts.headercb then
@@ -319,8 +322,15 @@ local function last(id)
   if not id then
     return #jobs > 0 and jobs[#jobs] or nil
   end
-  if jobs[id] and #jobs[id].old > 0 then
-    return jobs[id].old[#jobs[id].old]
+  local job = jobs[id]
+  if not job then
+    return nil
+  end
+  if job.current then
+    return job.current
+  end
+  if #job.old > 0 then
+    return job.old[#job.old]
   end
   return nil
 end
