@@ -309,17 +309,16 @@ function Job:setbuf(buf)
 
   bufu.clear(buf.nr)
 
-  if bufopts.headercb then
-    self.header = bufopts.headercb()
+  if #self.header > 0 then
     bufu.append(buf.nr, self.header)
   end
   if #self.output > 0 then
     bufu.append(buf.nr, self.output)
   end
-  if self.exit and bufopts.footercb then
-    self.footer = bufopts.footercb(self.exit, self.output)
+  if #self.footer > 0 then
     bufu.append(buf.nr, self.footer)
   end
+
   if bufopts.confcb then
     bufopts.confcb(buf.nr)
   end
