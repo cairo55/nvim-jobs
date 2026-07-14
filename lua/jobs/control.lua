@@ -380,10 +380,31 @@ local function last(id)
   return nil
 end
 
+--- @param id string
+--- @return Job?, Job.Buffer?
+local function restorebuf(id)
+  vim.validate({
+    id = { id, "string" }
+  })
+
+  local job = last(id)
+  if not job then
+    return
+  end
+
+  local buf = job.buf
+  if not buf.nr or not bufu.loaded_p(buf.nr) then
+    buf = job:newbuf()
+  end
+
+  return job, buf
+end
+
 -- INTERFACE --
 return {
   start = start,
   get = get,
   last = last,
   jobs = jobs,
+  restorebuf = restorebuf,
 }

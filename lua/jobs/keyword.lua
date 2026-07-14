@@ -40,17 +40,12 @@ local function keyword(kw)
 
   local buf = nil
 
-  if not job then
-    vim.notify('A keyword process is already running')
-    job = jobc.last('Keyword')
-    assert(job)
-    buf = job.buf
-  else
-    buf = job:newbuf(true, false)
-  end
-
-  if not buf.nr or not bufu.loaded_p(buf.nr) then
+  if job then
     buf = job:newbuf()
+  else
+    vim.notify('A keyword process is already running')
+    job, buf = jobc.restorebuf('Keyword')
+    assert(job and buf)
   end
 
   if not bufu.visible_p(buf.nr) then

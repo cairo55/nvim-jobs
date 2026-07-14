@@ -441,15 +441,12 @@ end
 -- COMMANDS --
 local function Compile(opts)
   if opts.args == '' then
-    local job = jobc.last('Compilation')
+    local job, buf = jobc.restorebuf('Compilation')
     if not job then
-      vim.notify('No compilation job to display', loglvl.WARN)
-      return
+      vim.notify("No compilation job to display", loglvl.ERROR)
     end
-    local buf = job.buf
-    if not buf.nr or not bufu.loaded_p(buf.nr) then
-      buf = job:newbuf()
-    end
+    -- if restorebuf gave us a buffer, it should have also given us a number
+    assert(job and buf and buf.nr)
     if not bufu.visible_p(buf.nr) then
       bufu.current(buf.nr)
       bufu.set_cursor(buf.nr, { #job.header, 0 })
@@ -462,18 +459,13 @@ local function Compile(opts)
 
   local buf = nil
 
-  if not job then
-    vim.notify('A compilation process is already running')
-    job = jobc.last('Compilation')
-    assert(job)
-    buf = job.buf
-  else
+  if job then
     buf = job:newbuf()
     bufu.set_cursor(buf.nr, { #job.header, 0 })
-  end
-
-  if not buf.nr or not bufu.loaded_p(buf.nr) then
-    buf = job:newbuf()
+  else
+    vim.notify('A compilation process is already running')
+    job, buf = jobc.restorebuf('Compilation')
+    assert(job and buf)
   end
 
   if not bufu.visible_p(buf.nr) then
@@ -492,18 +484,13 @@ local function Recompile()
 
   local buf = nil
 
-  if not job then
-    vim.notify('A compilation process is already running')
-    job = jobc.last('Compilation')
-    assert(job)
-    buf = job.buf
-  else
+  if job then
     buf = job:newbuf()
     bufu.set_cursor(buf.nr, { #job.header, 0 })
-  end
-
-  if not buf.nr or not bufu.loaded_p(buf.nr) then
-    buf = job:newbuf()
+  else
+    vim.notify('A compilation process is already running')
+    job, buf = jobc.restorebuf('Compilation')
+    assert(job and buf)
   end
 
   if not bufu.visible_p(buf.nr) then

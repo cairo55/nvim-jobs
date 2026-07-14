@@ -59,17 +59,12 @@ local function JobStop(opts)
 end
 
 local function JobBuffer(opts)
-  local job = jobc.get(opts.args)
+  local job, buf = jobc.restorebuf(opts.args)
   if not job then
     vim.notify(string.format("No job with ID `%s'", opts.args), loglvl.ERROR)
     return
   end
-
-  local buf = job.buf
-  if not buf.nr or not bufu.loaded_p(buf.nr) then
-    buf = job:newbuf()
-  end
-
+  assert(buf)
   bufu.current(buf.nr)
 end
 
