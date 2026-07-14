@@ -61,6 +61,9 @@ local jobs = {}
 local augroup = api.nvim_create_augroup('JobCtrl', { clear = true })
 
 -- INPUT PROCESSING --
+--- @param cb  fun(lines: string[], ctx: table)
+--- @param ctx table
+--- @return fun(err: string?, data: string?)
 local function chunker(cb, ctx)
   local accum = ''
   return function(err, data)
@@ -98,17 +101,19 @@ local function chunker(cb, ctx)
   end
 end
 
+--- @param lines string[]
+--- @param info { job: Job, callbacks: Job.WriterCallbacks }
 local function writer(lines, info)
-  local job, cb = info.job, info.cb
+  local job, cb = info.job, info.callbacks
 
   vim.schedule(function()
     if cb.filtercb then
       cb.filtercb(lines)
     end
 
-    local buf = job.buf
-
+    --- @type Job.LineInfo[]
     local lineinfo = {}
+
     for i = 1, #lines do
       local last = #job.output
       job.output[last + 1] = lines[i]
@@ -128,6 +133,8 @@ local function writer(lines, info)
   end)
 end
 
+--- @param exit vim.SystemCompleted
+--- @param info { job: Job, cb: fun(job: Job) }
 local function on_exit(exit, info)
   local job = info.job
   job.obj = nil
@@ -205,8 +212,8 @@ local function start(id, cmd, opts)
   local obj = vim.system(cmd, {
     detach = true,
     text = true,
-    stdout = chunker(writer, { job = job, cb = cb.out or {} }),
-    stderr = chunker(writer, { job = job, cb = cb.err or {} }),
+    stdout = chunker(writer, { job = job, callbacks = cb.out or {} }),
+    stderr = chunker(writer, { job = job, callbacks = cb.err or {} }),
   }, function(exit)
     on_exit(exit, { job = job, cb = cb.exitcb })
   end)
