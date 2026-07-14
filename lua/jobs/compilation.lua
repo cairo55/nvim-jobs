@@ -43,7 +43,7 @@ S.current = nil
 --- @type Compilation.Entry[]
 S.entries = {}
 
---- @type CompilationParser[]
+--- @type Compilation.Parser[]
 S.parsers = {}
 
 -- CURRENT ENTRY EXTMARK --
@@ -279,14 +279,14 @@ local function hlentry(bufnr, entry)
     [vim.diagnostic.severity.INFO] = 'compilationEntrySeverityInfo',
     [vim.diagnostic.severity.HINT] = 'compilationEntrySeverityHint',
   }
-  if severity then
-    hl(bufnr, sevhl[entry.severity.value], lnum, severity.startpos, severity.endpos)
+  if offs.severity then
+    hl(bufnr, sevhl[entry.severity], lnum, offs.severity.start_col, offs.severity.end_col)
   end
 end
 
 -- JOB --
 --- @param cmd      string|table
---- @param parsers? CompilationParser[]
+--- @param parsers? Compilation.Parser[]
 --- @return Job?
 local function compile(cmd, parsers)
   vim.validate({
@@ -299,6 +299,8 @@ local function compile(cmd, parsers)
 
   parsers = parsers or S.parsers
 
+  --- @param job      Job
+  --- @param lineinfo Job.LineInfo
   local function post(job, lineinfo)
     local buf = job.buf
 
@@ -510,7 +512,7 @@ local function Recompile()
 end
 
 -- SETUP --
---- @param parsers? CompilationParser[]
+--- @param parsers? Compilation.Parser[]
 local function setup(parsers)
   vim.validate('parsers', parsers, 'table', true)
   if parsers then
