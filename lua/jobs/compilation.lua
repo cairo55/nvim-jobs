@@ -57,9 +57,9 @@ local markopts = {
 --- @param entry Compilation.Entry
 --- @return boolean
 local function setentry(entry)
-  local file = entry.file.value
-  local row = entry.line.value
-  local column = entry.column and entry.column.value - 1 or 0
+  local file = entry.file
+  local row = entry.line
+  local column = entry.column and entry.column - 1 or 0
 
   local bufnr = bufu.nr(file)
   if bufnr > 0 then
@@ -227,17 +227,17 @@ local function toqf()
   local qf = {}
   for _, entry in ipairs(S.entries) do
     local qfe = {
-      filename = entry.file.value,
-      lnum = entry.line.value,
+      filename = entry.file,
+      lnum = entry.line,
     }
     if entry.column then
-      qfe.col = entry.column.value
+      qfe.col = entry.column
     end
     if entry.severity then
-      qfe.type = type[entry.severity.value]
+      qfe.type = type[entry.severity]
     end
     if entry.text then
-      qfe.text = entry.text.value
+      qfe.text = entry.text
     end
     table.insert(qf, qfe)
   end
@@ -258,19 +258,18 @@ end
 --- @param entry Compilation.Entry
 local function hlentry(bufnr, entry)
   local lnum = entry.lnum
-  local file = entry.file
-  local line = entry.line
-  local column = entry.column
-  local severity = entry.severity
+  local offs = entry.offsets
 
-  hl(bufnr, 'compilationEntryFile', lnum, file.startpos, file.endpos)
-
-  if line then
-    hl(bufnr, 'compilationEntryLine', lnum, line.startpos, line.endpos)
+  if offs.file then
+    hl(bufnr, 'compilationEntryFile', lnum, offs.file.start_col, offs.file.end_col)
   end
 
-  if column then
-    hl(bufnr, 'compilationEntryColumn', lnum, column.startpos, column.endpos)
+  if offs.line then
+    hl(bufnr, 'compilationEntryLine', lnum, offs.line.start_col, offs.line.end_col)
+  end
+
+  if offs.column then
+    hl(bufnr, 'compilationEntryColumn', lnum, offs.column.start_col, offs.column.end_col)
   end
 
   local sevhl = {
