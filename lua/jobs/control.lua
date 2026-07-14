@@ -123,7 +123,9 @@ local function writer(lines, info)
       })
     end
 
-    if bufu.loaded_p(buf.nr) then
+    local buf = job.buf
+
+    if buf.nr and bufu.loaded_p(buf.nr) then
       bufu.append(buf.nr, lines)
     end
 
@@ -142,8 +144,6 @@ local function on_exit(exit, info)
   jobs[job.id].current = nil
   table.insert(jobs[job.id].old, job)
   vim.schedule(function()
-    local bufopts = job.bufopts
-
     local msg
     local c = exit.code + exit.signal
     if c == 0 then
@@ -157,9 +157,17 @@ local function on_exit(exit, info)
       info.cb(job)
     end
 
-    if bufu.loaded_p(job.buf.nr) and bufopts.footercb then
-      bufu.append(job.buf.nr, bufopts.footercb(exit, job.output))
+    local bufopts = job.bufopts
+    if bufopts.footercb then
+      job.footer = bufopts.footercb(exit, job.output)
     end
+
+    local buf = job.buf
+    if not buf.nr or not bufu.loaded_p(buf.nr) then
+      return
+    end
+
+    bufu.append(buf.nr, job.footer)
   end)
 end
 
@@ -208,6 +216,11 @@ local function start(id, cmd, opts)
   job.footer = {}
   job.buf = jobs[id].buf
   job.bufopts = opts.bufopts or {}
+
+  local bufopts = job.bufopts
+  if bufopts.headercb then
+    job.header = bufopts.headercb()
+  end
 
   local obj = vim.system(cmd, {
     detach = true,
