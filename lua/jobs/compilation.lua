@@ -452,6 +452,7 @@ local function Compile(opts)
     end
     if not bufu.visible_p(buf.nr) then
       bufu.current(buf.nr)
+      bufu.set_cursor(buf.nr, { #job.header, 0 })
     end
     return
   end
