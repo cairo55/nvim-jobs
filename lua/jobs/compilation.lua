@@ -447,7 +447,7 @@ local function Compile(opts)
       return
     end
     local buf = job.buf
-    if not buf.nr then
+    if not buf.nr or not bufu.loaded_p(buf.nr) then
       buf = job:newbuf()
     end
     if not bufu.visible_p(buf.nr) then
