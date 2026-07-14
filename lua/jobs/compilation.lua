@@ -393,6 +393,7 @@ local function compile(cmd, parsers)
             vim.notify('failed to set entry', loglvl.WARN)
             return
           end
+          S.current = i
           vim.notify(string.format('%i out of %i', i, #S.entries))
         end
       end
