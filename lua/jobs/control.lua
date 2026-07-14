@@ -114,7 +114,7 @@ local function writer(lines, info)
       job.output[last + 1] = lines[i]
       table.insert(lineinfo, {
         line = lines[i],
-        lnum = (job.header and #job.header or 0) + last + 1,
+        lnum = #job.header + last + 1,
       })
     end
 
@@ -196,7 +196,9 @@ local function start(id, cmd, opts)
   job.id = id
   job.nr = #jobs + 1
   job.cmd = cmd
+  job.header = {}
   job.output = {}
+  job.footer = {}
   job.buf = jobs[id].buf
   job.bufopts = opts.bufopts or {}
 
