@@ -3,14 +3,18 @@ local fn = vim.fn
 local api = vim.api
 
 -- BUFFER UTILITY --
---- @param name string
+--- @param name? string
 --- @return integer
 local function new(name)
-  vim.validate('name', name, 'string')
+  vim.validate({
+    name = { name, 'string', true },
+  })
 
   local new = api.nvim_create_buf(true, true)
   vim.bo[new].modifiable = false
-  api.nvim_buf_set_name(new, name)
+  if name then
+    api.nvim_buf_set_name(new, name)
+  end
   return new
 end
 
@@ -112,14 +116,14 @@ local function current(new)
 end
 
 --- @param bufnr integer
---- @param new   string
+--- @param new?  string
 local function name(bufnr, new)
   vim.validate({
     bufnr = { bufnr, 'number' },
-    new = { new, 'string' },
+    new = { new, 'string', true },
   })
 
-  local old = fn.bufname()
+  local old = fn.bufname(bufnr)
   -- With `nomodifiable`, setting the buffer name to the same as it currently
   -- is seems to unset the alternate buffer for some reason. So don't do that.
   if new and new ~= old then
@@ -180,6 +184,9 @@ end
 
 --- @param bufnr integer
 local function visible_p(bufnr)
+  vim.validate({
+    bufnr = { bufnr, 'number' },
+  })
   local wins = api.nvim_tabpage_list_wins(0)
   for _, win in ipairs(wins) do
     if api.nvim_win_get_buf(win) == bufnr then
@@ -192,6 +199,10 @@ end
 --- @param bufnr integer
 --- @param pos   [integer, integer]
 local function set_cursor(bufnr, pos)
+  vim.validate({
+    bufnr = { bufnr, 'number' },
+    pos = { pos, 'table' },
+  })
   local wins = fn.win_findbuf(bufnr)
   for _, win in ipairs(wins) do
     api.nvim_win_set_cursor(win, pos)

@@ -1,47 +1,33 @@
 -- PRELUDE --
-local api = vim.api
-local fn = vim.fn
 local o = vim.o
+local fn = vim.fn
+local api = vim.api
 local loglvl = vim.log.levels
 
 local jobc = require('jobs/control')
 local bufu = require('jobs/bufutil')
 
 -- TYPES --
---- @class Compilation.Entry.File
---- @field value    string
---- @field startpos integer
---- @field endpos   integer
-
---- @class Compilation.Entry.Line
---- @field value    integer
---- @field startpos integer
---- @field endpos   integer
-
---- @class Compilation.Entry.Column
---- @field value    integer
---- @field startpos integer
---- @field endpos   integer
-
---- @class Compilation.Entry.Severity
---- @field value    vim.diagnostic.Severity
---- @field startpos integer
---- @field endpos   integer
-
---- @class Compilation.Entry.Text
---- @field value    string
---- @field startpos integer
---- @field endpos   integer
+--- @class Compilation.Range
+--- @field start_col integer
+--- @field end_col   integer
 
 --- @class Compilation.Entry
 --- @field lnum?     integer
---- @field file      Compilation.Entry.File
---- @field line      Compilation.Entry.Line
---- @field column?   Compilation.Entry.Column
---- @field severity? Compilation.Entry.Severity
---- @field text?     Compilation.Entry.Text
+--- @field file      string
+--- @field line      integer
+--- @field column?   integer
+--- @field severity? vim.diagnostic.Severity
+--- @field text?     string
+--- @field offsets {
+---   file?:     Compilation.Range,
+---   line?:     Compilation.Range,
+---   column?:   Compilation.Range,
+---   severity?: Compilation.Range,
+---   text?:     Compilation.Range,
+--- }
 
---- @alias CompilationParser fun(line: string): Compilation.Entry
+--- @alias Compilation.Parser fun(line: string): Compilation.Entry
 
 -- STATE --
 local S = {}
@@ -123,12 +109,12 @@ local function setentry(entry)
   bufu.current(bufnr)
   api.nvim_win_set_cursor(0, { row, column })
 
-  local compbuf = S.job.buffer.nr
+  local compbuf = S.job.buf.nr
   local ns = api.nvim_create_namespace('Compilation')
   if S.entrymark and bufu.loaded_p(S.entrymarkbuf) then
     api.nvim_buf_del_extmark(S.entrymarkbuf, ns, S.entrymark)
   end
-  if bufu.loaded_p(compbuf) then
+  if compbuf and bufu.loaded_p(compbuf) then
     S.entrymarkbuf = compbuf
     S.entrymark = api.nvim_buf_set_extmark(compbuf, ns, entry.lnum - 1, 0, markopts)
   end
@@ -301,6 +287,7 @@ end
 -- JOB --
 --- @param cmd      string|table
 --- @param parsers? CompilationParser[]
+--- @return Job?
 local function compile(cmd, parsers)
   vim.validate({
     cmd = { cmd, { 'string', 'table' } },
@@ -313,27 +300,33 @@ local function compile(cmd, parsers)
   parsers = parsers or S.parsers
 
   local function post(job, lineinfo)
+    local buf = job.buf
+
     for _, li in ipairs(lineinfo) do
       for _, parser in ipairs(parsers) do
         local entry = parser(li.line)
         if entry then
           entry.lnum = li.lnum
           table.insert(S.entries, entry)
-          local buf = job.buffer
-          if bufu.loaded_p(buf.nr) then
+
+          if buf.nr and bufu.loaded_p(buf.nr) then
             hlentry(buf.nr, entry)
           end
+
           break
         end
       end
     end
 
-    local bufnr = job.buffer.nr
-    local wins = fn.win_findbuf(bufnr)
+    if not buf.nr or not bufu.loaded_p(buf.nr) then
+      return
+    end
+
+    local wins = fn.win_findbuf(buf.nr)
     for _, win in ipairs(wins) do
-      local lc = api.nvim_buf_line_count(job.buffer.nr)
+      local lc = api.nvim_buf_line_count(buf.nr)
       local row = api.nvim_win_get_cursor(win)[1]
-      if row == lc - #lineinfo and row > #job.buffer.header then
+      if row == lc - #lineinfo and row > #job.header then
         api.nvim_win_set_cursor(win, { lc, 0 })
         api.nvim_win_call(win, function()
           local wh = api.nvim_win_get_height(0)
@@ -423,45 +416,67 @@ local function compile(cmd, parsers)
   end
 
   local job = jobc.start('Compilation', jcmd, {
-    buf = {
+    bufopts = {
       name = '[Compilation]',
       headercb = header,
       footercb = footer,
       confcb = conf,
     },
-    cb = {
-      out = { post = post },
-      err = { post = post },
+    callbacks = {
+      out = { postcb = post },
+      err = { postcb = post },
     },
   })
 
   if not job then
-    vim.notify('A compilation process is already running', loglvl.WARN)
-    return
+    return nil
   end
 
   S.job = job
+  return job
 end
 
 -- COMMANDS --
 local function Compile(opts)
-  local args = opts.args
-  if args ~= '' then
-    compile(opts.args)
-    vim.g.recompile = opts.args
-  end
-
-  local job = jobc.last('Compilation')
-  if not job then
-    vim.notify('No compilation buffer', loglvl.WARN)
+  if opts.args == '' then
+    local job = jobc.last('Compilation')
+    if not job then
+      vim.notify('No compilation job to display', loglvl.WARN)
+      return
+    end
+    local buf = job.buf
+    if not buf.nr then
+      buf = job:newbuf()
+    end
+    if not bufu.visible_p(buf.nr) then
+      bufu.current(buf.nr)
+    end
     return
   end
 
-  local buf = job:buf()
-  if not bufu.visible_p(buf) then
-    bufu.current(buf)
+  local job = compile(opts.args)
+  vim.g.recompile = opts.args
+
+  local buf = nil
+
+  if not job then
+    vim.notify('A compilation process is already running')
+    job = jobc.last('Compilation')
+    assert(job)
+    buf = job.buf
+  else
+    buf = job:newbuf()
+    bufu.set_cursor(buf.nr, { #job.header, 0 })
   end
-  bufu.set_cursor(buf, { #job.buffer.header, 0 })
+
+  if not buf.nr or not bufu.loaded_p(buf.nr) then
+    buf = job:newbuf()
+  end
+
+  if not bufu.visible_p(buf.nr) then
+    bufu.current(buf.nr)
+    bufu.set_cursor(buf.nr, { #job.header, 0 })
+  end
 end
 
 local function Recompile()
@@ -469,7 +484,29 @@ local function Recompile()
     vim.notify('No previous compilation command', loglvl.ERROR)
     return
   end
-  compile(vim.g.recompile)
+
+  local job = compile(vim.g.recompile)
+
+  local buf = nil
+
+  if not job then
+    vim.notify('A compilation process is already running')
+    job = jobc.last('Compilation')
+    assert(job)
+    buf = job.buf
+  else
+    buf = job:newbuf()
+    bufu.set_cursor(buf.nr, { #job.header, 0 })
+  end
+
+  if not buf.nr or not bufu.loaded_p(buf.nr) then
+    buf = job:newbuf()
+  end
+
+  if not bufu.visible_p(buf.nr) then
+    bufu.current(buf.nr)
+    bufu.set_cursor(buf.nr, { #job.header, 0 })
+  end
 end
 
 -- SETUP --

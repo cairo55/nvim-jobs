@@ -1,6 +1,6 @@
 -- PRELUDE --
+local fn = vim.fn
 local api = vim.api
-
 local loglvl = vim.log.levels
 
 local bufu = require('jobs/bufutil')
@@ -13,22 +13,22 @@ local bufu = require('jobs/bufutil')
 --- @field confcb?   fun(bufnr: integer)
 
 --- @class Job.Buffer
---- @field nr      integer
---- @field header? string[]
---- @field footer? string[]
---- @field opts    Job.BufferOpts
+--- @field nr? integer
 
 --- @class Job
---- @field id     string
---- @field nr     integer
---- @field cmd    string[]
---- @field output string[]
---- @field buffer Job.Buffer
---- @field obj?   vim.SystemObj
---- @field exit?  vim.SystemCompleted
+--- @field id      string
+--- @field nr      integer
+--- @field cmd     string[]
+--- @field header  string[]
+--- @field footer  string[]
+--- @field output  string[]
+--- @field buf     Job.Buffer
+--- @field bufopts Job.BufferOpts
+--- @field obj?    vim.SystemObj
+--- @field exit?   vim.SystemCompleted
 
 --- @class Job.IdEntry
---- @field buffer   Job.Buffer
+--- @field buf      Job.Buffer
 --- @field current? Job
 --- @field old      Job[]
 
@@ -41,17 +41,17 @@ local bufu = require('jobs/bufutil')
 --- @field lnum integer
 
 --- @class Job.WriterCallbacks
---- @field filter? fun(lines: string[])
---- @field post?   fun(job: Job, lineinfo: Job.LineInfo[])
+--- @field filtercb? fun(lines: string[])
+--- @field postcb?   fun(job: Job, lineinfo: Job.LineInfo[])
 
 --- @class Job.Callbacks
---- @field out?  Job.WriterCallbacks
---- @field err?  Job.WriterCallbacks
---- @field exit? fun(job: Job)
+--- @field out?    Job.WriterCallbacks
+--- @field err?    Job.WriterCallbacks
+--- @field exitcb? fun(job: Job)
 
 --- @class Job.StartOpts
---- @field buf? Job.BufferOpts
---- @field cb?  Job.Callbacks
+--- @field bufopts?   Job.BufferOpts
+--- @field callbacks? Job.Callbacks
 
 -- STATE --
 --- @type Job.Table
@@ -102,11 +102,11 @@ local function writer(lines, info)
   local job, cb = info.job, info.cb
 
   vim.schedule(function()
-    if cb.filter then
-      cb.filter(lines)
+    if cb.filtercb then
+      cb.filtercb(lines)
     end
 
-    local buf = job.buffer
+    local buf = job.buf
 
     local lineinfo = {}
     for i = 1, #lines do
@@ -114,7 +114,7 @@ local function writer(lines, info)
       job.output[last + 1] = lines[i]
       table.insert(lineinfo, {
         line = lines[i],
-        lnum = (buf.header and #buf.header or 0) + last + 1,
+        lnum = (job.header and #job.header or 0) + last + 1,
       })
     end
 
@@ -122,8 +122,8 @@ local function writer(lines, info)
       bufu.append(buf.nr, lines)
     end
 
-    if cb.post then
-      cb.post(job, lineinfo)
+    if cb.postcb then
+      cb.postcb(job, lineinfo)
     end
   end)
 end
@@ -135,8 +135,7 @@ local function on_exit(exit, info)
   jobs[job.id].current = nil
   table.insert(jobs[job.id].old, job)
   vim.schedule(function()
-    local buf = job.buffer
-    local opts = buf.opts
+    local bufopts = job.bufopts
 
     local msg
     local c = exit.code + exit.signal
@@ -151,8 +150,8 @@ local function on_exit(exit, info)
       info.cb(job)
     end
 
-    if bufu.loaded_p(buf.nr) and opts.footercb then
-      bufu.append(buf.nr, opts.footercb(exit, job.output))
+    if bufu.loaded_p(job.buf.nr) and bufopts.footercb then
+      bufu.append(job.buf.nr, bufopts.footercb(exit, job.output))
     end
   end)
 end
@@ -179,10 +178,7 @@ local function start(id, cmd, opts)
 
   if not jobs[id] then
     jobs[id] = {
-      buffer = {
-        nr = 0,
-        opts = {},
-      },
+      buf = {},
       current = nil,
       old = {},
     }
@@ -192,7 +188,7 @@ local function start(id, cmd, opts)
     return nil
   end
 
-  local cb = opts.cb or {}
+  local cb = opts.callbacks or {}
 
   local job = {}
   setmetatable(job, Job)
@@ -201,18 +197,8 @@ local function start(id, cmd, opts)
   job.nr = #jobs + 1
   job.cmd = cmd
   job.output = {}
-  job.buffer = jobs[id].buffer
-
-  local buf = job.buffer
-  local bufopts = opts.buf or buf.opts
-  buf.opts = bufopts
-  if bufu.loaded_p(buf.nr) then
-    bufu.clear(buf.nr)
-    if bufopts.headercb then
-      buf.header = bufopts.headercb()
-      bufu.append(buf.nr, buf.header)
-    end
-  end
+  job.buf = jobs[id].buf
+  job.bufopts = opts.bufopts or {}
 
   local obj = vim.system(cmd, {
     detach = true,
@@ -220,7 +206,7 @@ local function start(id, cmd, opts)
     stdout = chunker(writer, { job = job, cb = cb.out or {} }),
     stderr = chunker(writer, { job = job, cb = cb.err or {} }),
   }, function(exit)
-    on_exit(exit, { job = job, cb = cb.exit })
+    on_exit(exit, { job = job, cb = cb.exitcb })
   end)
 
   job.obj = obj
@@ -245,63 +231,101 @@ function Job:kill(signal)
   return vim.uv.kill(-self.obj.pid, signal or 'sigterm')
 end
 
---- @return integer
-function Job:buf()
-  local buf = self.buffer
-  local bufopts = buf.opts
+--- @param replace? boolean
+--- @param delete? boolean
+--- @return Job.Buffer
+function Job:newbuf(replace, delete)
+  vim.validate({
+    replace = { replace, 'boolean', true },
+    delete = { delete, 'boolean', true },
+  })
 
-  local name = bufopts.name
-  if not name then
-    name = string.format('[Job %s]', self.id)
+  if replace == nil then
+    replace = true
+  end
+  if delete == nil then
+    delete = true
   end
 
-  if bufu.loaded_p(buf.nr) then
-    bufu.name(buf.nr, name)
-    return buf.nr
-  elseif bufu.valid_p(buf.nr) then
-    -- delete if valid but not loaded
-    bufu.delete(buf.nr)
+  local bufopts = self.bufopts
+
+  if not bufopts.name then
+    bufopts.name = string.format('[Job %s]', self.id)
+  end
+
+  --- @type Job.Buffer
+  local buf = { nr = bufu.new() }
+
+  if replace then
+    local old = self.buf
+    if old.nr and bufu.valid_p(old.nr) then
+      for _, win in ipairs(fn.win_findbuf(old.nr)) do
+        if delete then
+          local alt = fn.bufnr('#')
+          if alt > 0 then
+            api.nvim_win_set_buf(win, alt)
+          end
+        end
+        api.nvim_win_set_buf(win, buf.nr)
+      end
+      if delete then
+        bufu.delete(old.nr)
+        old.nr = nil
+      end
+    end
   end
 
   -- buffer we don't own, but using the name we want
-  local target = bufu.nr(name)
+  local target = bufu.nr(bufopts.name)
   if target > 0 then
     bufu.delete(target)
   end
 
-  local new = bufu.new(name)
-  buf.nr = new
+  bufu.name(buf.nr, bufopts.name)
+
+  self:setbuf(buf)
+  return buf
+end
+
+--- @param buf Job.Buffer
+function Job:setbuf(buf)
+  local bufopts = self.bufopts
+
+  if not buf.nr or not bufu.loaded_p(buf.nr) then
+    return
+  end
 
   api.nvim_create_autocmd('BufDelete', {
-    buffer = new,
+    buffer = buf.nr,
     callback = function()
       if self.exit then
         return
       end
       vim.notify(string.format('%s will continue to run', self.id))
     end,
+    once = true,
     group = augroup,
   })
 
+  bufu.clear(buf.nr)
+
   if bufopts.headercb then
-    buf.header = bufopts.headercb()
-    bufu.append(buf.nr, buf.header)
+    self.header = bufopts.headercb()
+    bufu.append(buf.nr, self.header)
   end
-
   if #self.output > 0 then
-    bufu.append(new, self.output)
+    bufu.append(buf.nr, self.output)
   end
-
   if self.exit and bufopts.footercb then
-    buf.footer = bufopts.footercb(self.exit, self.output)
-    bufu.append(buf.nr, buf.footer)
+    self.footer = bufopts.footercb(self.exit, self.output)
+    bufu.append(buf.nr, self.footer)
   end
-
   if bufopts.confcb then
-    bufopts.confcb(new)
+    bufopts.confcb(buf.nr)
   end
 
-  return new
+  self.buf = buf
+  jobs[self.id].buf = buf
 end
 
 --- @param nr_or_id integer | string

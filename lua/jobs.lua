@@ -35,12 +35,12 @@ local function JobStop(opts)
 
   local job
   if id == '' then
-    for _, j in pairs(jobc.jobs) do
-      if j.obj and j.buffer.nr == bufu.current() then
+    for _, j in ipairs(jobc.jobs) do
+      if j.buf.nr == bufu.current() then
         job = j
       end
     end
-    if not job then
+    if not job or not job.obj or job.exit then
       vim.notify('No job associated with current buffer', loglvl.ERROR)
       return
     end
@@ -65,8 +65,12 @@ local function JobBuffer(opts)
     return
   end
 
-  local buf = job:buf()
-  bufu.current(buf)
+  local buf = job.buf
+  if not buf.nr or not bufu.loaded_p(buf.nr) then
+    buf = job:newbuf()
+  end
+
+  bufu.current(buf.nr)
 end
 
 local function setup()

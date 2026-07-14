@@ -1,6 +1,7 @@
 -- PRELUDE --
 local fn = vim.fn
 local api = vim.api
+local loglvl = vim.log.levels
 
 local jobc = require('jobs/control')
 local bufu = require('jobs/bufutil')
@@ -26,9 +27,8 @@ local function keyword(kw)
   local cmd = { unpack(assoc[ft].cmd) }
   table.insert(cmd, kw)
 
-  local id = string.format('%s %s', name, kw)
-  local job = jobc.start(id, cmd, {
-    buf = {
+  local job = jobc.start('Keyword', cmd, {
+    bufopts = {
       name = string.format('[%s %s]', name, kw),
       confcb = function(bufnr)
         if assoc[ft].ft then
@@ -37,13 +37,24 @@ local function keyword(kw)
       end,
     },
   })
+
+  local buf = nil
+
   if not job then
-    return
+    vim.notify('A keyword process is already running')
+    job = jobc.last('Keyword')
+    assert(job)
+    buf = job.buf
+  else
+    buf = job:newbuf(true, false)
   end
 
-  local buf = job:buf()
-  if not bufu.visible_p(buf) then
-    bufu.current(buf)
+  if not buf.nr or not bufu.loaded_p(buf.nr) then
+    buf = job:newbuf()
+  end
+
+  if not bufu.visible_p(buf.nr) then
+    bufu.current(buf.nr)
   end
 end
 
