@@ -122,19 +122,20 @@ local function setentry(entry)
   return true
 end
 
+--- @param entry Compilation.Entry
 local function shouldjump(entry)
   local fname = fn.expand('%:t')
   local row, col = unpack(vim.api.nvim_win_get_cursor(0))
 
-  if entry.file.value ~= fname then
+  if entry.file ~= fname then
     return true
   end
 
-  if entry.line.value ~= row then
+  if entry.line ~= row then
     return true
   end
 
-  if entry.column and entry.column.value ~= col + 1 then
+  if entry.column and entry.column ~= col + 1 then
     return true
   end
 
