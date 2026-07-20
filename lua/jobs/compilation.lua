@@ -445,6 +445,7 @@ local function Compile(opts)
     local job, buf = jobc.restorebuf('Compilation')
     if not job then
       vim.notify("No compilation job to display", loglvl.ERROR)
+      return
     end
     -- if restorebuf gave us a buffer, it should have also given us a number
     assert(job and buf and buf.nr)
