@@ -381,8 +381,10 @@ local function last(id)
 end
 
 --- @param id string
+--- @param replace boolean
+--- @param delete boolean
 --- @return Job?, Job.Buffer?
-local function restorebuf(id)
+local function restorebuf(id, replace, delete)
   vim.validate({
     id = { id, "string" }
   })
@@ -394,7 +396,7 @@ local function restorebuf(id)
 
   local buf = job.buf
   if not buf.nr or not bufu.loaded_p(buf.nr) then
-    buf = job:newbuf()
+    buf = job:newbuf(replace, delete)
   end
 
   return job, buf
